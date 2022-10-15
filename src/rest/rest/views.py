@@ -5,11 +5,12 @@ from rest_framework.response import Response
 from rest_framework import status
 import json, logging, os
 from pymongo import MongoClient
-from .todoserializer import TodoSerializer
+from .serializer import Todo
 
 mongo_uri = 'mongodb://' + os.environ["MONGO_HOST"] + ':' + os.environ["MONGO_PORT"]
-db = MongoClient(mongo_uri)['test_db']
-collection = db.mydatabase
+db1 = MongoClient(mongo_uri)
+db = db1['test_db']
+collection = db.mynewdatabase
 
 class TodoListView(APIView):
 
@@ -18,18 +19,29 @@ class TodoListView(APIView):
         todos = collection.find()
 
         for todo in todos:
-            serializer = TodoSerializer(data=todo)
-            if serializer.is_valid():
-                result.append(serializer.validated_data)
+            try:
+                data = Todo(todo=todo.get('todo'))
+            except KeyError:
+                print("key not found")
+
+            try:
+                temp = json.dumps(data, default=data.encode_todo)
+                result.append(eval(temp))
+            except TypeError:
+                print("Not a valid serializer")
 
         return Response(result, status=status.HTTP_200_OK)
         
     def post(self, request):
-        serializer = TodoSerializer(data=request.data)
+        data = Todo(todo=request.data.get('todo'))
 
-        if serializer.is_valid():
-            collection.insert_one(serializer.data)
-            return Response('OK', status=status.HTTP_200_OK)
-
-        return Response('error', status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serialize = json.dumps(data, default=data.encode_todo)
+            serialized = eval(serialize)
+            collection.insert_one(serialized)
+            return Response('ok!', status=status.HTTP_200_OK)
+        except NameError:
+            print("not a valid serialize!")
+        
+        return Response('error!', status=status.HTTP_400_BAD_REQUEST)
 
